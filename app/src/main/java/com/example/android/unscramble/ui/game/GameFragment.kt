@@ -21,18 +21,24 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.fragment.app.Fragment
+import androidx.fragment.app.viewModels
 import com.example.android.unscramble.R
 import com.example.android.unscramble.databinding.GameFragmentBinding
+import androidx.fragment.app.viewModels
+import androidx.lifecycle.ViewModel
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 
 /**
  * Fragment where the game is played, contains the game logic.
  */
 class GameFragment : Fragment() {
+    // Syntax for property delegation
+    
 
-    private var score = 0
-    private var currentWordCount = 0
-    private var currentScrambledWord = "test"
+    //var <property-name> : <property-type> by <delegate-class>()
 
+
+    private val viewModel: GameViewModel by viewModels()
 
     // Binding object instance with access to the views in the game_fragment.xml layout
     private lateinit var binding: GameFragmentBinding
@@ -54,13 +60,17 @@ class GameFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
 
         // Setup a click listener for the Submit and Skip buttons.
-        binding.submit.setOnClickListener { onSubmitWord() }
-        binding.skip.setOnClickListener { onSkipWord() }
+        binding.submit.setOnClickListener {
+            onSubmitWord()
+        }
+        binding.skip.setOnClickListener {
+            onSkipWord()
+        }
         // Update the UI
         updateNextWordOnScreen()
-        binding.score.text = getString(R.string.score, 0)
+        binding.score.text = getString(R.string.score, viewModel.score)
         binding.wordCount.text = getString(
-                R.string.word_count, 0, MAX_NO_OF_WORDS)
+                R.string.word_count, viewModel.currentWordCount, MAX_NO_OF_WORDS)
     }
 
     /*
@@ -68,13 +78,19 @@ class GameFragment : Fragment() {
     * Displays the next scrambled word.
     */
     private fun onSubmitWord() {
-        currentScrambledWord = getNextScrambledWord()
-        currentWordCount++
-        score += SCORE_INCREASE
-        binding.wordCount.text = getString(R.string.word_count, currentWordCount, MAX_NO_OF_WORDS)
-        binding.score.text = getString(R.string.score, score)
-        setErrorTextField(false)
-        updateNextWordOnScreen()
+        val playerWord = binding.textInputEditText.text.toString()
+
+        if (viewModel.isUserWordCorrect(playerWord)) {
+            setErrorTextField(false)
+            if (viewModel.nextWord()) {
+                updateNextWordOnScreen()
+            } else {
+                showFinalScoreDialog()
+            }
+
+        }else {
+            setErrorTextField(true)
+        }
     }
 
     /*
@@ -82,11 +98,12 @@ class GameFragment : Fragment() {
      * Increases the word count.
      */
     private fun onSkipWord() {
-        currentScrambledWord = getNextScrambledWord()
-        currentWordCount++
-        binding.wordCount.text = getString(R.string.word_count, currentWordCount, MAX_NO_OF_WORDS)
-        setErrorTextField(false)
-        updateNextWordOnScreen()
+        if (viewModel.nextWord()) {
+            setErrorTextField(false)
+            updateNextWordOnScreen()
+        } else {
+            showFinalScoreDialog()
+        }
     }
 
     /*
@@ -103,6 +120,7 @@ class GameFragment : Fragment() {
      * restart the game.
      */
     private fun restartGame() {
+        viewModel.reinitializeData()
         setErrorTextField(false)
         updateNextWordOnScreen()
     }
@@ -131,6 +149,25 @@ class GameFragment : Fragment() {
      * Displays the next scrambled word on screen.
      */
     private fun updateNextWordOnScreen() {
-        binding.textViewUnscrambledWord.text = currentScrambledWord
+        binding.textViewUnscrambledWord.text = viewModel.currentScrambledWord
+        binding.score.text = getString(R.string.score, viewModel.score)
+        binding.wordCount.text = getString(
+            R.string.word_count, viewModel.currentWordCount, MAX_NO_OF_WORDS)
+
     }
+    // context is contain all info of project , color theme and so..
+    private fun showFinalScoreDialog() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.congratulations))
+            .setMessage(getString(R.string.you_scored, viewModel.score))
+            .setCancelable(false)
+            .setNegativeButton(getString(R.string.exit)) { _, _ ->
+                exitGame()
+            }
+            .setPositiveButton(getString(R.string.play_again)) { _, _ ->
+                restartGame()
+            }
+            .show()
+    }// end of showFinalScore *Dialog*
+
 }
